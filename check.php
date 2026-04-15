@@ -4,6 +4,7 @@
 //  Nur erreichbar wenn in config.php: define('ENABLE_CHECK', true);
 // ═══════════════════════════════════════════════════════════════════
 
+define('RM_BOOT', true);
 require __DIR__ . '/config.php';
 
 if (!defined('ENABLE_CHECK') || ENABLE_CHECK !== true) {

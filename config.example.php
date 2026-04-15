@@ -1,4 +1,6 @@
 <?php
+// Direct access guard
+if (!defined('RM_BOOT')) { http_response_code(403); exit('403 Forbidden'); }
 // ═══════════════════════════════════════════════════════════════════
 //  config.example.php — Copy this to config.php and fill in values
 // ═══════════════════════════════════════════════════════════════════

@@ -1,3 +1,4 @@
+<?php if (!defined('RM_BOOT')) { http_response_code(403); exit('403 Forbidden'); } ?>
 <!DOCTYPE html>
 <html lang="de">
 <head>

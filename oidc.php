@@ -1,4 +1,5 @@
 <?php
+if (!defined('RM_BOOT')) { http_response_code(403); exit('403 Forbidden'); }
 // ═══════════════════════════════════════════════════════════════════
 //  oidc.php – Authentik OIDC Authentifizierung
 // ═══════════════════════════════════════════════════════════════════

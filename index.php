@@ -3,6 +3,8 @@
 //  index.php – Einstiegspunkt & App
 // ═══════════════════════════════════════════════════════════════════
 
+define('RM_BOOT', true);
+
 require __DIR__ . '/config.php';
 require __DIR__ . '/oidc.php';
 require __DIR__ . '/htaccess.php';

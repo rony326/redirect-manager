@@ -1,4 +1,5 @@
 <?php
+if (!defined('RM_BOOT')) { http_response_code(403); exit('403 Forbidden'); }
 // ═══════════════════════════════════════════════════════════════════
 //  htaccess.php – .htaccess lesen und schreiben
 // ═══════════════════════════════════════════════════════════════════
@@ -72,7 +73,7 @@ function parseRedirects(): array {
         if (preg_match('/^RewriteRule\s+(\S+)\s+(\S+)\s+\[([^\]]*R=(301|302)[^\]]*)\]/i', $t, $m)) {
             $pattern   = $m[1];
             $cleanFrom = '/' . preg_replace(
-                ['/^\^/', '/\/?\\$$/', '/\(\?:[^)]+\)/', '/\(\.\*\)/', '/\\\\/'],
+                ['/^\^/', '/\/?\$$/', '/\(\?:[^)]+\)/', '/\(\.\*\)/', '/\\/'],
                 ['', '', '*', '*', '/'],
                 $pattern
             );
@@ -187,5 +188,7 @@ function saveRedirects(array $redirects): void {
         }
     }
 
-    file_put_contents(HTACCESS, implode("\n", $out) . "\n");
+    file_put_contents(HTACCESS, implode("
+", $out) . "
+");
 }
