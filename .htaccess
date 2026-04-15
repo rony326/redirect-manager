@@ -4,13 +4,29 @@
 
 Options -Indexes
 
-# Block sensitive file extensions (old-style, works everywhere)
+# ── Block all PHP files except public entry points ──────
+<FilesMatch "\.php$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+<FilesMatch "^(index|callback|check)\.php$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# ── Allow stylesheet ─────────────────────────────────────
+<FilesMatch "^style\.css$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# ── Block sensitive file types ───────────────────────────
 <FilesMatch "\.(bak|log|sql|sh|env|ini|json|md|txt|zip|tar|gz|gitignore)$">
     Order allow,deny
     Deny from all
 </FilesMatch>
 
-# Security Headers (wrapped in IfModule so it never breaks)
+# ── Security Headers ────────────────────────────────────
 <IfModule mod_headers.c>
     Header always set X-Frame-Options "DENY"
     Header always set X-Content-Type-Options "nosniff"

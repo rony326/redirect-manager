@@ -1,8 +1,8 @@
 # Redirect Manager
 
-A lightweight, self-hosted PHP web interface to manage Apache `.htaccess` redirects — built for shared hosting environments like Infomaniak.
+A self-hosted PHP web interface for managing Apache `.htaccess` redirects — built for shared hosting environments like Infomaniak.
 
-Authentication is handled via **Authentik** (OpenID Connect), so no passwords are stored in the app itself. Individual redirect entries can be protected with a separate **lock password**.
+Authentication is handled via **Authentik** (OpenID Connect). Individual entries can be organised with **categories**, protected with a **lock password**, and exported as **QR codes**.
 
 ![PHP](https://img.shields.io/badge/PHP-8.0%2B-777bb4?logo=php&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -15,13 +15,19 @@ Authentication is handled via **Authentik** (OpenID Connect), so no passwords ar
 - **Read & write** all redirect rules directly from/to `.htaccess`
 - Supports **three Apache redirect syntaxes**: `Redirect`, `RedirectMatch`, `RewriteRule [R=301/302]`
 - **301 / 302** toggle per entry
-- **Inline editing** with comment field
-- **Lock protection** per entry — requires a separate lock password to edit or delete
-- **Authentik OIDC** login — no local password stored, session-based
+- **Inline editing** with comment and category fields
+- **Categories** — tag-based grouping with colour badges and filter bar
+- **Lock protection** — per-entry lock requiring a separate password to edit or delete
+- **Bulk actions** — select multiple entries to lock/unlock, change code, change URL, or set category
+- **Sortable columns** — click any header to sort
+- **QR Code** per entry — generates and downloads a PNG QR code for the full redirect URL
+- **Copy to clipboard** — copies the full redirect URL with one click
+- **Authentik OIDC** login — no local password, session-based
 - **Automatic backup** (`.htaccess.bak`) before every save
-- All other `.htaccess` content (DEFLATE, RewriteEngine, Git protection, etc.) is preserved
-- Built-in **diagnostic tool** (`check.php`) controlled by a config flag
-- Folder hardened via `.htaccess` security rules + HTTP security headers
+- All other `.htaccess` content preserved on save
+- Built-in **diagnostic tool** (`check.php`) controlled by config flag
+- Responsive layout — card view on mobile, progressive column hiding on tablet
+- Folder hardened via `.htaccess` rules + HTTP security headers
 
 ---
 
@@ -29,14 +35,16 @@ Authentication is handled via **Authentik** (OpenID Connect), so no passwords ar
 
 ```
 redirect-manager/
-├── config.php       ← Only file you need to edit
-├── index.php        ← Entry point & POST action handler
-├── oidc.php         ← Authentik OIDC auth flow (cURL-based)
-├── htaccess.php     ← .htaccess parser & writer
-├── view.php         ← HTML / CSS / JS frontend
-├── callback.php     ← OIDC callback endpoint
-├── check.php        ← Diagnostic tool (enable in config.php)
-└── .htaccess        ← Folder security rules
+├── config.php          ← Only file you need to edit
+├── index.php           ← Entry point & POST handler
+├── oidc.php            ← Authentik OIDC auth flow (cURL-based)
+├── htaccess.php        ← .htaccess parser & writer
+├── view.php            ← HTML template
+├── style.css           ← Stylesheet (browser-cached separately)
+├── callback.php        ← OIDC callback endpoint
+├── check.php           ← Diagnostic tool (enable in config.php)
+├── config.example.php  ← Template for config.php
+└── .htaccess           ← Folder security rules
 ```
 
 ---
@@ -46,7 +54,7 @@ redirect-manager/
 - PHP **8.0+**
 - **cURL** extension (no `allow_url_fopen` needed)
 - **OpenSSL** extension
-- Apache with `mod_rewrite` and `mod_headers` enabled
+- Apache with `mod_rewrite` and `mod_headers`
 - A running **Authentik** instance
 
 ---
@@ -55,78 +63,42 @@ redirect-manager/
 
 ### 1. Create an Authentik Application
 
-In the Authentik admin panel (`https://auth.yourdomain.com/if/admin`):
+In the Authentik admin panel:
 
-1. Go to **Applications → Create with Wizard**
-2. Set a name (e.g. `Redirect Manager`) and slug (e.g. `redirect-manager`)
-3. Provider type: **OAuth2/OpenID Connect**
-4. Client type: **Confidential**
-5. Add redirect URI:
-   ```
-   https://yourdomain.com/redirect-manager/callback.php
-   ```
-6. Set **Launch URL**:
-   ```
-   https://yourdomain.com/redirect-manager/
-   ```
-7. Save and note the **Client ID** and **Client Secret** from the provider
+1. **Applications → Create with Wizard**
+2. Name: `Redirect Manager`, slug: `redirect-manager`
+3. Provider type: **OAuth2/OpenID Connect**, client type: **Confidential**
+4. Redirect URI: `https://yourdomain.com/redirect-manager/callback.php`
+5. Launch URL: `https://yourdomain.com/redirect-manager/`
+6. Note the **Client ID** and **Client Secret**
 
-Verify your OIDC discovery endpoint is reachable:
-```
-https://auth.yourdomain.com/application/o/redirect-manager/.well-known/openid-configuration
-```
+### 2. Configure `config.php`
 
-### 2. Configure the App
-
-Edit `config.php` and fill in your values:
+Copy `config.example.php` to `config.php` and fill in your values:
 
 ```php
 define('OIDC_CLIENT_ID',     'your-client-id');
 define('OIDC_CLIENT_SECRET', 'your-client-secret');
 define('OIDC_ISSUER',        'https://auth.yourdomain.com/application/o/redirect-manager');
-define('APP_URL',            'https://yourdomain.com/redirect-manager');  // no trailing slash
+define('APP_URL',            'https://yourdomain.com/redirect-manager'); // no trailing slash
 define('LOCK_PASSWORD',      'your-lock-password');
-define('HTACCESS',           '../.htaccess');
-define('HTACCESS_BACKUP',    '../.htaccess.bak');
-define('ENABLE_CHECK',       false);  // set to true only during setup
+define('SITE_BASE_URL',      'https://yourdomain.com'); // used for QR codes & clipboard
+define('ENABLE_CHECK',       false);
 ```
 
 ### 3. Upload via FTP
 
-Upload the entire `redirect-manager/` folder to your web root:
-
-```
-/sites/yourdomain.com/
-    redirect-manager/
-        .htaccess
-        callback.php
-        check.php
-        config.php
-        htaccess.php
-        index.php
-        oidc.php
-        view.php
-    .htaccess          ← your existing site .htaccess (managed by this tool)
-```
+Upload the entire `redirect-manager/` folder to your web root.
 
 ### 4. Run the Diagnostic Tool
 
-Temporarily enable `check.php` in `config.php`:
+Enable `check.php` temporarily:
 
 ```php
 define('ENABLE_CHECK', true);
 ```
 
-Open in browser:
-```
-https://yourdomain.com/redirect-manager/check.php
-```
-
-All checks should be green. Then **disable it again**:
-
-```php
-define('ENABLE_CHECK', false);
-```
+Open `https://yourdomain.com/redirect-manager/check.php` — all checks should be green. Then set `ENABLE_CHECK` back to `false`.
 
 ### 5. Open the App
 
@@ -134,19 +106,38 @@ define('ENABLE_CHECK', false);
 https://yourdomain.com/redirect-manager/
 ```
 
-You will be redirected to Authentik to log in. After authentication you land in the manager.
+You will be redirected to Authentik to log in.
+
+---
+
+## Configuration Reference
+
+| Constant | Description |
+|---|---|
+| `OIDC_CLIENT_ID` | Client ID from Authentik provider |
+| `OIDC_CLIENT_SECRET` | Client Secret from Authentik provider |
+| `OIDC_ISSUER` | OIDC issuer URL (format: `https://auth.domain/application/o/slug`) |
+| `APP_URL` | Public URL of the redirect-manager folder, no trailing slash |
+| `LOCK_PASSWORD` | Password to lock/unlock individual entries |
+| `SITE_BASE_URL` | Root domain for building full URLs in QR codes and clipboard |
+| `HTACCESS` | Path to the `.htaccess` file to manage (default: `../htaccess`) |
+| `HTACCESS_BACKUP` | Path for automatic backup (default: `../.htaccess.bak`) |
+| `SESSION_NAME` | PHP session name (default: `rm_session`) |
+| `ENABLE_CHECK` | `true` enables `check.php` diagnostic tool (disable in production) |
+| `CATEGORIES` | Array of categories: `'slug' => ['label' => '...', 'color' => '#hex']` |
 
 ---
 
 ## File Permissions
 
-| File | Permission | Notes |
-|---|---|---|
-| `config.php` | `640` | Contains secrets — restrict group read |
-| All other `.php` | `644` | Read-only for PHP process |
-| `.htaccess` (this folder) | `644` | Read by Apache |
-| `../.htaccess` (site root) | `644` | PHP needs write access — use `664` if saving fails |
-| Folder itself | `755` | |
+| File | Permission |
+|---|---|
+| `config.php` | `640` — contains secrets |
+| All other `.php` | `644` |
+| `style.css` | `644` |
+| `.htaccess` (this folder) | `644` |
+| `../.htaccess` (site root) | `644` (use `664` if saving fails) |
+| Folder | `755` |
 
 ---
 
@@ -156,77 +147,45 @@ You will be redirected to Authentik to log in. After authentication you land in 
 
 ```
 User visits /redirect-manager/
-  → index.php: no valid session
-  → Generate state + nonce, store in session
-  → Redirect to Authentik authorization endpoint
+  → No valid session → generate state + nonce
+  → Redirect to Authentik
 
 User logs in at Authentik
-  → Authentik redirects to /redirect-manager/callback.php?code=...
-
-callback.php → index.php:
-  → Validate state (CSRF protection)
-  → Exchange code for tokens via cURL POST
+  → Redirect to /callback.php?code=...
+  → Validate state (CSRF), exchange code for tokens
   → Validate nonce in id_token
-  → Fetch user info from userinfo endpoint
-  → Store user data in PHP session
-  → Redirect to /redirect-manager/
+  → Store user info in session
+  → Redirect to /
 
 Logout:
-  → Destroy PHP session
-  → Redirect to Authentik end_session endpoint
+  → Destroy session → redirect to Authentik end_session
 ```
 
 ### .htaccess Handling
 
-The parser reads all three common redirect syntaxes:
+Supported syntaxes:
 
 ```apache
-Redirect 301 /from https://to                        # type: redirect
-RedirectMatch 301 ^/pattern$ https://to              # type: redirectmatch
-RewriteRule ^path/?$ https://to [R=301,L]            # type: rewrite
+Redirect 301 /from https://to           # type: redirect
+RedirectMatch 301 ^/pattern$ https://to  # type: redirectmatch
+RewriteRule ^path/?$ https://to [R=301,L] # type: rewrite
 ```
 
-Comments immediately preceding a rule are read as the entry's **label**. A `# [locked]` comment marks an entry as lock-protected.
-
-On save, the tool:
-1. Creates a backup at `.htaccess.bak`
-2. Strips all managed redirect lines (and their preceding comments)
-3. Inserts the updated block after `RewriteEngine On`
-4. Preserves all other content unchanged
-
----
-
-## Lock Protection
-
-Individual entries can be locked with a separate **lock password** (defined in `config.php` as `LOCK_PASSWORD`, independent from the Authentik login).
-
-- The 🔓/🔒 icon on each row opens a modal to toggle the lock state
-- Locked entries require the lock password to edit or delete
-- The lock flag is stored as `# [locked]` in `.htaccess` directly above the rule
+Comments above a rule are read as the entry label. `# [locked]` marks an entry as lock-protected. `# [cat:slug]` assigns a category. On save, only managed redirect lines are replaced — all other `.htaccess` content is preserved.
 
 ---
 
 ## Troubleshooting
 
-| Error | Likely cause | Fix |
-|---|---|---|
-| Blank page / no redirect to Authentik | `config.php` not loaded | Check file path and PHP errors |
-| `Authentik not reachable` | cURL can't reach OIDC issuer | Verify `OIDC_ISSUER` URL, run `check.php` |
-| `State mismatch` | Session cookie issue | Check `session_save_path` in `check.php` |
-| `Token exchange failed` | Wrong client secret or redirect URI mismatch | Compare `APP_URL/callback.php` with Authentik provider settings exactly |
-| Redirect loop after login | Wrong `APP_URL` or missing Launch URL in Authentik | Set Launch URL in Authentik application to `APP_URL/` |
-| 403 on the folder | `.htaccess` FilesMatch issue | Ensure `mod_headers` is enabled on your host |
-| `.htaccess` not saved | PHP can't write to site root | Set `../.htaccess` to `664` |
-
----
-
-## Security Notes
-
-- Client Secret and Lock Password are stored only in `config.php` — set permissions to `640`
-- `check.php` is blocked by default (`ENABLE_CHECK = false`) — no need to delete it
-- The folder `.htaccess` blocks direct access to all files except `index.php` and `callback.php` from the browser; `config.php`, `oidc.php`, `htaccess.php` and `view.php` are PHP includes only
-- Sessions expire when the Authentik token expires (`exp` claim in id_token)
-- CSRF is mitigated via the OIDC `state` parameter + nonce validation
+| Error | Fix |
+|---|---|
+| `Authentik not reachable` | Verify `OIDC_ISSUER`, run `check.php` |
+| `State mismatch` | Session issue — check `session_save_path` in `check.php` |
+| `Token exchange failed` | Wrong client secret or redirect URI mismatch |
+| Redirect loop after login | Set Launch URL in Authentik to `APP_URL/` |
+| 403 on `index.php` | Check that `RM_BOOT` is defined before requiring `config.php` |
+| `.htaccess` not saved | Set `../.htaccess` to `664` |
+| QR code not generating | Check browser console — `qrcode.min.js` requires internet access |
 
 ---
 

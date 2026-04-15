@@ -23,6 +23,7 @@ function parseRedirects(): array {
     $redirects      = [];
     $pendingComment = '';
     $pendingLocked  = false;
+    $pendingCat     = '';
 
     foreach ($lines as $li => $line) {
         $t = trim($line);
@@ -32,6 +33,8 @@ function parseRedirects(): array {
             $c = trim($cm[1]);
             if ($c === '[locked]') {
                 $pendingLocked = true;
+            } elseif (preg_match('/^\[cat:([^\]]+)\]$/', $c, $catm)) {
+                $pendingCat = trim($catm[1]);
             } elseif (
                 !str_starts_with($c, 'SECTION') &&
                 !str_starts_with($c, '---') &&
@@ -47,11 +50,13 @@ function parseRedirects(): array {
         $base = [
             'comment'  => $pendingComment,
             'locked'   => $pendingLocked,
+            'cat'      => $pendingCat,
             'line_idx' => $li,
             'original' => $t,
         ];
         $pendingComment = '';
         $pendingLocked  = false;
+        $pendingCat     = '';
 
         // Redirect 301/302 /pfad https://...
         if (preg_match('/^Redirect\s+(301|302)\s+(\S+)\s+(\S+)$/i', $t, $m)) {
@@ -73,7 +78,7 @@ function parseRedirects(): array {
         if (preg_match('/^RewriteRule\s+(\S+)\s+(\S+)\s+\[([^\]]*R=(301|302)[^\]]*)\]/i', $t, $m)) {
             $pattern   = $m[1];
             $cleanFrom = '/' . preg_replace(
-                ['/^\^/', '/\/?\$$/', '/\(\?:[^)]+\)/', '/\(\.\*\)/', '/\\/'],
+                ['/^\^/', '/\/?\\$$/', '/\(\?:[^)]+\)/', '/\(\.\*\)/', '#\\\\#'],
                 ['', '', '*', '*', '/'],
                 $pattern
             );
@@ -105,7 +110,7 @@ function saveRedirects(array $redirects): void {
         $lines = ['RewriteEngine On'];
     }
 
-    // Zeilen ermitteln die entfernt werden (alte Redirects + ihre Kommentare)
+    // Find lines to remove (also strip [cat:...] comment lines)
     $remove = [];
     foreach ($lines as $li => $line) {
         $t = trim($line);
@@ -116,8 +121,7 @@ function saveRedirects(array $redirects): void {
 
         if ($isRedirect) {
             $remove[] = $li;
-            // Bis zu 2 vorherige Kommentarzeilen ebenfalls entfernen
-            for ($b = 1; $b <= 2; $b++) {
+            for ($b = 1; $b <= 3; $b++) {
                 $pi = $li - $b;
                 if ($pi >= 0
                     && preg_match('/^#/', trim($lines[$pi] ?? ''))
@@ -130,10 +134,7 @@ function saveRedirects(array $redirects): void {
                 }
             }
         }
-
-        if (preg_match('/^#\s*---\s*Weiterleitungen/i', $t)) {
-            $remove[] = $li;
-        }
+        if (preg_match('/^#\s*---\s*Weiterleitungen/i', $t)) $remove[] = $li;
     }
     $remove = array_unique($remove);
 
@@ -155,6 +156,7 @@ function saveRedirects(array $redirects): void {
         $newLines[] = '# --- Weiterleitungen (verwaltet via Redirect Manager) ---';
         foreach ($redirects as $r) {
             if (!empty($r['locked']))  $newLines[] = '# [locked]';
+            if (!empty($r['cat']))     $newLines[] = '# [cat:' . $r['cat'] . ']';
             if (!empty($r['comment'])) $newLines[] = '# ' . $r['comment'];
             $type = $r['type'] ?? 'rewrite';
             if ($type === 'redirect') {
