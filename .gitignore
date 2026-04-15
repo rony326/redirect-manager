@@ -1,0 +1,15 @@
+# Never commit real credentials
+config.php
+
+# Backups created by the tool
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
